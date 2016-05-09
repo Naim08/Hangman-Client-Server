@@ -1,0 +1,102 @@
+
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.PrintStream;
+import java.io.Reader;
+
+public class TextHangmanClient
+extends AbstractHangmanClient {
+    private SafeBufferedReader keyboard = new SafeBufferedReader((Reader)new InputStreamReader(System.in));
+
+    public TextHangmanClient(boolean bl, String string, int n) {
+        super(bl, string, n);
+    }
+
+    @Override
+    public char elicitGuess() {
+        char c = '\u0000';
+        try {
+            String string;
+            do {
+                System.out.print("Letter? ");
+                System.out.flush();
+            } while (!Character.isLetter(c = (string = this.keyboard.readLine()).charAt(0)));
+        }
+        catch (IOException var2_3) {
+            System.err.println("TextHangmanClient.elicitGuess threw: " + var2_3);
+        }
+        return Character.toUpperCase(c);
+    }
+
+    @Override
+    public void displayGame() {
+        System.out.println("Word: " + this.wordSoFar);
+        System.out.println("Guesses remaining: " + this.guessesRemaining);
+    }
+
+    @Override
+    public void congratulateWinner() {
+        System.out.println("Word was: " + this.theWord);
+        System.out.println("Congratulations! You got the word!");
+    }
+
+    @Override
+    public void punishLoser() {
+        System.out.println("Sorry! Too many guesses!");
+        System.out.println("Word was: " + this.theWord);
+        System.out.println("Hangman ... take a few \"practice swings\" (heh, heh).");
+    }
+
+    @Override
+    public boolean elicitPlayAgain() {
+        char c = '\u0000';
+        try {
+            do {
+                System.out.print("Another game (Y/N)? ");
+                System.out.flush();
+                String string = this.keyboard.readLine();
+                c = string.charAt(0);
+            } while ((c = Character.toUpperCase(c)) != 'Y' && c != 'N');
+        }
+        catch (IOException var2_3) {
+            System.err.println("TextHangmanClient.elicitGuess threw: " + var2_3);
+        }
+        return c == 'Y';
+    }
+
+    public static void main(String[] arrstring) {
+        String string = "erdos.dsm.fordham.edu";
+        boolean bl = false;
+        int n = 0;
+        if (arrstring.length > 0 && arrstring[0].charAt(0) == '-') {
+            ++n;
+            switch (arrstring[0].charAt(1)) {
+                case 'd': {
+                    bl = true;
+                    break;
+                }
+                case 'h': {
+                    TextHangmanClient.usage();
+                    System.exit(0);
+                    break;
+                }
+                default: {
+                    TextHangmanClient.usage();
+                    System.exit(1);
+                }
+            }
+        }
+        if (arrstring.length > n) {
+            string = arrstring[n];
+        }
+        new TextHangmanClient(bl, string, 9998);
+    }
+
+    public static void usage() {
+        System.err.println("Usage: HangmanServer [-d] [-h] [server]");
+        System.err.println("  -d: print debugging info");
+        System.err.println("  -h: print this help msg");
+    }
+}

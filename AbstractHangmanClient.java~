@@ -1,0 +1,157 @@
+package ClientServer;
+import ClientServer.SafeBufferedReader;
+import ClientServer.SimpleSocketClient;
+
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.PrintStream;
+import java.io.Reader;
+
+public abstract class AbstractHangmanClient
+extends SimpleSocketClient {
+    protected static final String HANGMAN_DEFAULT_SERVER = "erdos.dsm.fordham.edu";
+    protected static final int HANGMAN_DEFAULT_PORT = 9999;
+    protected int guessesRemaining;
+    protected String theWord;
+    protected StringBuffer wordSoFar;
+    private static final int STATE_UNCONNECTED = 0;
+    private static final int STATE_CONNECTED = 1;
+    private static final int STATE_PLAYING = 2;
+    private static final int STATE_WINNER = 3;
+    private static final int STATE_LOSER = 4;
+    private static final int MAX_BAD_GUESSES = 10;
+    private int wordLength;
+    private int numNotGuessed;
+    private int state;
+    private char guess;
+    private SafeBufferedReader remoteBR;
+
+    public AbstractHangmanClient(boolean bl, String string, int n) {
+        super(string, n);
+        this.debugOn = bl;
+        this.start();
+    }
+
+    public void handleSession() {
+        DataInputStream dataInputStream = new DataInputStream(this.remoteInputStream);
+        InputStreamReader inputStreamReader = new InputStreamReader(dataInputStream);
+        this.remoteBR = new SafeBufferedReader((Reader)inputStreamReader);
+        this.state = 1;
+        try {
+            this.remoteBR.readLine();
+            this.remoteBR.readLine();
+            block8 : do {
+                switch (this.state) {
+                    case 0: {
+                        break;
+                    }
+                    case 1: {
+                        this.startNewGame();
+                        break;
+                    }
+                    case 2: {
+                        this.guess = this.elicitGuess();
+                        if (this.debugOn) {
+                            System.out.println("Letter guessed: " + this.guess);
+                        }
+                        this.processGuess();
+                        if (!this.debugOn) continue block8;
+                        System.out.println("Word so far: " + this.wordSoFar);
+                        break;
+                    }
+                    case 3: 
+                    case 4: {
+                        this.handleEndGame();
+                        break;
+                    }
+                    default: {
+                        System.err.println("This can't happen: state = " + this.state);
+                        this.state = 0;
+                    }
+                }
+            } while (this.state != 0);
+            this.remoteOutputStream.writeBytes("BYE\n");
+        }
+        catch (Exception var3_3) {
+            System.err.println("HangmanClient.handleSession threw: " + var3_3);
+        }
+    }
+
+    public void startNewGame() {
+        try {
+            this.remoteOutputStream.writeBytes("NEW\n");
+            String string = this.remoteBR.readLine();
+            this.wordLength = Integer.parseInt(string.trim());
+            if (this.debugOn) {
+                System.out.println("startNewGame: wordlength = " + this.wordLength);
+            }
+            this.wordSoFar = new StringBuffer(this.wordLength);
+            for (int i = 0; i < this.wordLength; ++i) {
+                this.wordSoFar.append('*');
+            }
+            this.guessesRemaining = 10;
+            this.numNotGuessed = this.wordLength;
+            this.state = 2;
+            this.displayGame();
+        }
+        catch (IOException var1_2) {
+            System.err.println("HangmanClient.startNewGame threw: " + var1_2);
+        }
+    }
+
+    public void processGuess() {
+        try {
+            this.remoteOutputStream.writeBytes("GUESS " + this.guess + '\n');
+            boolean bl = false;
+            for (int i = 0; i < this.wordSoFar.length(); ++i) {
+                String string = this.remoteBR.readLine();
+                if (!Boolean.valueOf(string.trim()).booleanValue() || this.wordSoFar.charAt(i) != '*') continue;
+                this.wordSoFar.setCharAt(i, this.guess);
+                bl = true;
+                --this.numNotGuessed;
+            }
+            if (!bl) {
+                --this.guessesRemaining;
+            }
+            if (this.numNotGuessed == 0) {
+                this.state = 3;
+            } else if (this.guessesRemaining == 0) {
+                this.state = 4;
+            } else {
+                this.displayGame();
+            }
+        }
+        catch (IOException var1_2) {
+            System.err.println("HangmanClient.processGuess threw: " + var1_2);
+        }
+    }
+
+    public void handleEndGame() {
+        try {
+            this.remoteOutputStream.writeBytes("QUIT\n");
+            this.theWord = this.remoteBR.readLine();
+        }
+        catch (IOException var1_1) {
+            System.err.println("HangmanClient.handleEndGame threw: " + var1_1);
+        }
+        if (this.state == 3) {
+            this.congratulateWinner();
+        } else {
+            this.punishLoser();
+        }
+        this.state = this.elicitPlayAgain() ? 1 : 0;
+    }
+
+    public abstract char elicitGuess();
+
+    public abstract void displayGame();
+
+    public abstract void congratulateWinner();
+
+    public abstract void punishLoser();
+
+    public abstract boolean elicitPlayAgain();
+}
